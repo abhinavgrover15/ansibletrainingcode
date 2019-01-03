@@ -1,0 +1,139 @@
+---
+
+####### ARTIFACTS EXIST CHECK ######################################################
+
+- block:
+    - name: Check if rpm is already installed
+      command: rpm -q {{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64
+      ignore_errors: True
+      args:
+        warn: no
+      register: is_installed
+ 
+    - debug:
+        msg: "Build #{{ build_num }} is installed... Proceeding with the rollback... "
+      when: not is_installed.changed
+
+    - meta: end_play
+      when: is_installed.changed
+  when: project_type != 'java'
+
+- block:
+    - name: Check if java package is already installed
+      stat: 
+        path: "{{ dst_install_dir }}"
+      register: is_installed
+
+    - debug:
+        msg: "Build #{{ build_num }} is already installed... Proceeding with the rollback... "
+      when: is_installed.stat.exists
+
+    - meta: end_play
+      when: not is_installed.stat.exists
+  when: project_type == 'java'
+
+
+##### Stop Web Service ##############################################################
+
+- name: Stop web service
+  service: name={{ web_service }} state=stopped
+  when: web_service is defined
+  register: webservice_stopped 
+
+##### Stop App Service ##############################################################
+
+- name: Stop app service
+  service: name={{ app_service }} state=stopped
+  when: app_service is defined
+  register: appservice_stopped 
+
+##### ENABLE NEW PACKAGE ###########################################################
+
+- block:
+    - name: Check if install directory exists or not, for non-java projects
+      stat: path={{ install_dir }}
+      register: symlink_rpm
+
+    - name: Remove current symLink for non-java projects
+      file:
+        path: "{{ install_dir }}"
+        state: absent
+      when: symlink_rpm.stat.islnk is defined and symlink_rpm.stat.islnk
+
+    - name: Rollback to old package for non-java projects
+      file:
+        src: "{{ dst_install_dir }}"
+        dest: "{{ install_dir }}"
+        state: link
+  when: project_type != 'java'
+
+- block:
+    - name: Check if install directory exists or not, for java projects
+      stat: path={{ install_dir }}/{{ desired_name }}
+      register: symlink_war
+
+    - name: Remove current symLink for java projects
+      file:
+        path: "{{ install_dir }}/{{ desired_name }}"
+        state: absent
+      when: symlink_war.stat.islnk is defined and symlink_war.stat.islnk
+
+    - name: Rollback to old build for java projects
+      file:
+        src: "{{ dst_install_dir }}/{{ desired_name }}"
+        dest: "{{ install_dir }}/{{ desired_name }}"
+        state: link
+  when: project_type == 'java'
+
+
+##### Run PROJECT SPECIFIC POST TAKS ###############################################
+
+- name: Check if project's post task file exists
+  stat: path="{{ posttask_path }}/{{ project }}.yml"
+  delegate_to: localhost
+  register: posttask
+
+- name: delegate to project's post task
+  include_tasks: "{{ posttask_path }}/{{ project }}.yml"
+  when: posttask.stat.exists
+
+##### Start App Service ##############################################################
+
+- name: Start app service
+  service: name={{ app_service }} state=started
+  when: app_service is defined
+  register: appservice_started 
+
+##### Start Web Service ##############################################################
+
+- name: Start web service
+  service: name={{ web_service }} state=started
+  when: web_service is defined
+  register: webservice_started
+
+##### Rename HealthCheck File #####################################################
+
+- name: Check if healthcheck file Exists
+  stat: path={{ heathcheckfile }}.oos
+  when: heathcheckfile_exist != 'no'
+  register: heathcheckfile_status
+
+- name: Rename healthcheck file
+  command: mv {{ heathcheckfile }}.oos {{ heathcheckfile }} && sleep 30
+  when: heathcheckfile_status.changed and healthcheckfile_status.stat.exists
+
+######### HIT HEALTHCHECK URI ############################################################
+
+- name: Check health status
+  uri:
+   url: "http://{{ inventory_hostname }}:{{ health_port }}/{{ healthcheck_uri }}"
+   method: GET
+   status_code: 200
+   return_content: yes
+   headers:
+     Host: "{{ host_header | default('') }}"
+  register: health_status
+  retries: 60
+  delay: 5
+  until: health_status.status == 200
+

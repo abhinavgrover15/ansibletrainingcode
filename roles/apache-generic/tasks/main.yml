@@ -1,0 +1,55 @@
+---
+
+- name: install apache and inbuilt tools
+  yum:
+    name: "{{ item.pkg }}-{{ pkg_version }}.{{ arch }}"
+    state: present
+  with_items:
+      - '{{packages}}'
+
+
+- name: Creates apache custom directories
+  file: 
+     path: "{{ item }}" 
+     state: directory 
+     mode: 0755
+     owner: root
+     group: root
+  with_items:
+      - '{{dirs}}'
+
+- name: Creates Symbolink for apache logs
+  file:
+    src: /log/apache-log
+    dest: /etc/httpd/logs
+    mode: 0755
+    owner: root
+    group: root
+    state: link
+    force: yes
+
+- name: Generating Apache config file
+  template:
+   src=httpd-conf.j2
+   dest={{conf_root}}/httpd.conf
+   mode=0440
+
+- name: Delete welcome conf file
+  file:
+    state: absent
+    path: "{{ conf_d_root }}/welcome.conf"
+
+- copy:
+    src: "{{ item }}"
+    dest: "{{ server_root }}/modules/{{ item }}"
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - '{{modules}}'
+
+- name: Generating logrotate configuration file
+  template:
+   src=til-httpd-logrotate.j2
+   dest="/etc/logrotate.d/til-apache"
+   mode=0644

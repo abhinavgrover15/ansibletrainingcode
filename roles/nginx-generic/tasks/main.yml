@@ -1,0 +1,50 @@
+---
+
+- name: Install epel from remote repo on CentOS 7
+  yum: name=https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm state=present
+  when: ansible_distribution_major_version == "7"
+
+- name: installing nginx package
+  yum:
+    name: "{{ pkg_name }}-{{ nginx_version }}.{{ arch }}"
+    state: present
+
+- name: Delete default conf file
+  file:
+    state: absent
+    path: "{{ nginx_conf_d_root }}/default.conf"
+
+- name: Creates nginx custom directories
+  file:
+     path: "{{ item }}"
+     state: directory
+     mode: 0755
+     owner: root
+     group: root
+  with_items:
+      - "/log/nginx"
+      - "{{nginx_conf_root}}/ssl"
+
+- name: Generating Nginx Configuration file
+  template:
+   src=nginx-conf.j2
+   dest={{nginx_conf_root}}/nginx.conf
+   mode=0644
+
+- name: Creates Nginx Service
+  template:
+   src=nginx-service.j2
+   dest={{service_location}}/nginx.service
+   mode=0644
+
+- name: Setting up the nginx in startup
+  systemd:
+    name: "nginx.service"
+    enabled: yes
+    daemon_reload: yes
+
+- name: Generating logrotate configuration file
+  template:
+   src=nginx-logrotate.j2
+   dest="/etc/logrotate.d/nginx"
+   mode=0644

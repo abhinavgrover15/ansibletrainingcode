@@ -1,0 +1,92 @@
+---
+
+- name: Check Age of Private Key
+  script: "{{ ansible_base_path }}/shellplugins/ageofile /root/.ssh/id_rsa"
+  register: age
+  delegate_to: localhost
+  run_once: True
+
+- name: Create new ssh key-pair
+  command: ssh-keygen -t rsa -N "" -q -f "{{ new_priv_key }}" -C ""
+  when: '"timetochange" in age.stdout'
+  delegate_to: localhost
+  register: newkey
+  run_once: True
+
+- name: Upload New Keys to Central Server
+  command: curl -i -X POST -F files=@{{ item }} "http://xx.xx.xx:5000/upload"
+  with_items:
+    - /tmp/id_rsa
+    - /tmp/id_rsa.pub
+  when: newkey.changed == true
+  delegate_to: localhost
+  run_once: True
+
+- name: Download Private and Public Keys                       
+  uri:                                        
+    url: "http://xx.xx.xx/{{ item }}"    
+    method: GET                               
+    user: admin            
+    password: q5Qa#~X;?%=`/CBv)R  
+    force_basic_auth: yes                    
+    dest: /home/{{ item }}          
+  with_items:
+    - id_rsa
+    - id_rsa.pub
+  when: newkey.changed == true
+  delegate_to: localhost     
+  run_once: True
+
+- name: check if file exist in /home directory
+  stat:
+    path: /home/id_rsa.pub
+  delegate_to: localhost
+  register: st_id_rsa
+
+- name: Add new key to authorized_keys
+  authorized_key: 
+     key={{ lookup('file', "/home/id_rsa.pub") }}
+     user=auto
+     state=present
+  when: st_id_rsa.stat.exists == true
+
+- name: Make use of new private key when connecting
+  set_fact: ansible_private_ssh_key="/home/id_rsa"
+  when: st_id_rsa.stat.exists == true
+
+- name: Make our new key exclusive
+  authorized_key: key={{ lookup('file', "/home/id_rsa.pub") }}
+      user=auto 
+      state=present 
+      exclusive=yes
+  when: st_id_rsa.stat.exists == true
+
+- name: Move new key into default location
+  command: mv /home/id_rsa ~/.ssh/id_rsa
+  when: '"timetochange" in age.stdout'
+  delegate_to: localhost
+  run_once: True
+
+- name: Change Permissions of Key
+  file:
+    path: "/root/.ssh/id_rsa"
+    owner: root
+    group: root
+    mode: 0600
+    state: file 
+  when: newkey.changed == true
+  delegate_to: localhost
+  run_once: True
+
+- name: Remove Keys from Temp and Home Locations
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /home/id_rsa
+    - /home/id_rsa.pub
+    - /tmp/id_rsa
+    - /tmp/id_rsa.pub
+  when: '"timetochange" in age.stdout'
+  delegate_to: localhost
+  run_once: True

@@ -1,0 +1,13 @@
+---
+
+GREEN_PORT: 5002
+BLUE_PORT: 5001
+app_real_port: 5000
+poolname: gfc_abc_in_GCP_SG
+vipzone: bc-GCP-1A
+viplocation: GCP
+container_dir_tobe_mapped: /var/log/api 
+app_target_port: 80 
+number_of_service_replicas: 3
+minreplicas: 3
+maxreplicas: 6

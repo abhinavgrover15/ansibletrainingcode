@@ -1,0 +1,224 @@
+---
+
+####### ARTIFACTS EXIST CHECK ######################################################
+
+- block:
+    - name: Check if rpm is already installed
+      command: rpm -q {{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64
+      ignore_errors: True
+      args:
+        warn: no
+      register: is_installed
+ 
+    - debug:
+        msg: "Build #{{ build_num }} is already installed"
+      when: not is_installed.changed
+
+    - meta: end_play
+      when: not is_installed.changed
+  when: project_type != 'java'
+
+- block:
+    - name: Check if java package is already installed
+      stat: 
+        path: "{{ dst_install_dir }}"
+      register: is_installed
+
+    - debug:
+        msg: "Build #{{ build_num }} is already installed"
+      when: is_installed.stat.exists
+
+    - meta: end_play
+      when: is_installed.stat.exists
+  when: project_type == 'java'
+
+###### DOWNLOAD NEW ARTIFACT #######################
+
+- block:
+    - name: Remove rpm file from /tmp
+      file:
+        path: "/tmp/{{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64.rpm"
+        state: absent
+
+    - name: Get Artifact from RPM Repo Server
+      get_url:
+        url: "http://pkg-ci-{{ location }}.abc.in/repository/{{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64.rpm"
+        dest: "/tmp/"
+  when: project_type != 'java'
+
+- block:
+    - name: Remove java package from /tmp
+      file:
+        path: "/tmp/{{ pkg_name }}"
+        state: absent
+
+    - name: Get artifact from JAVA artifact server
+      get_url:
+        url: "http://artifacts-ci-{{ location }}.abc.in/repository/{{ build_job_name }}/{{ build_num }}/{{ pkg_name }}"
+        dest: "/tmp/{{ pkg_name }}"
+  when: project_type == 'java'
+
+###### INSTALL NEW ARTIFACT ########################################################
+
+- name: Install rpm
+  yum:
+    name: "/tmp/{{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64.rpm"
+    state: present
+  become_user: "root"
+  when: project_type != 'java'
+
+- block:
+    - name: Create destination directory
+      file: path={{ dst_install_dir }} state=directory
+
+    - name: Move artifact to destination directory
+      command: mv /tmp/{{ pkg_name }} {{ dst_install_dir }}/{{ desired_name }}
+  when: project_type == 'java'
+
+##### Rename HealthCheck File #####################################################
+
+- name: Check if healthcheck file Exists
+  stat: path={{ heathcheckfile }}
+  when: heathcheckfile_exist != 'no'
+  register: heathcheckfile_status
+
+- name: Rename healthcheck file
+  command: mv {{ heathcheckfile }} {{ heathcheckfile }}.oos && sleep 30
+  when: heathcheckfile_status.changed and healthcheckfile_status.stat.exists
+
+##### Stop Web Service ##############################################################
+
+- name: Stop web service
+  service: name={{ web_service }} state=stopped
+  when: web_service is defined
+  register: webservice_stopped 
+
+##### Stop App Service ##############################################################
+
+- name: Stop app service
+  service: name={{ app_service }} state=stopped
+  when: app_service is defined and project_type != 'python'
+  register: appservice_stopped 
+
+- name: Stop app service
+  command: "supervisorctl stop {{ repo_name }}"
+  when: project_type == 'python'
+  register: appservice_stopped
+
+
+##### ENABLE NEW PACKAGE ###########################################################
+
+- block:
+    - name: Check if install directory exists or not, for non-java projects
+      stat: path={{ install_dir }}
+      register: symlink_rpm
+
+    - name: Rename the install directory if it is not a link for non-java projects
+      command: mv {{ install_dir }} {{ install_dir }}_0
+      when: symlink_rpm.stat.islnk is defined and symlink_rpm.stat.islnk == False
+
+    - name: Remove old symLink for non-java projects
+      file:
+        path: "{{ install_dir }}"
+        state: absent
+      when: symlink_rpm.stat.islnk is defined and symlink_rpm.stat.islnk
+
+    - name: Create new symlink for non-java projects
+      file:
+        src: "{{ dst_install_dir }}"
+        dest: "{{ install_dir }}"
+        state: link
+  when: project_type != 'java'
+
+- block:
+    - name: Check if install directory exists or not, for java projects
+      stat: path={{ install_dir }}/{{ desired_name }}
+      register: symlink_war
+
+    - name: Rename the install directory if it is not a link for java projects
+      command: mkdir {{ install_dir }}_0; mv {{ install_dir }}/{{ desired_name }} {{ install_dir }}_0; rm -rf {{ install_dir }}/{{ desired_name | basename | regex_replace('\.war','') }}
+      when: symlink_war.stat.islnk is defined and symlink_war.stat.islnk == False
+
+    - name: Remove old symLink for java projects
+      file:
+        path: "{{ install_dir }}/{{ desired_name }}"
+        state: absent
+      when: symlink_war.stat.islnk is defined and symlink_war.stat.islnk
+
+    - name: Create new symlink for java projects
+      file:
+        src: "{{ dst_install_dir }}/{{ desired_name }}"
+        dest: "{{ install_dir }}/{{ desired_name }}"
+        state: link
+  when: project_type == 'java'
+
+######### CHANGE PERMISSIONS ############
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: apache
+    group: apache
+    recurse: yes
+  when: project_type == 'php'
+
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: app
+    group: app
+    recurse: yes
+  when: project_type != 'php'
+
+##### installing pip packages ##################################################### 
+
+- name: installing pip packages
+  pip:
+    requirements: "/opt/{{ repo_name }}/pip_req.txt"
+    virtualenv: "/opt/virtualenvs/{{ repo_name }}"
+  when: project_type == 'python'
+
+##### Run PROJECT SPECIFIC POST TAKS ###############################################
+
+- name: Check if project's post task file exists
+  stat: path="{{ posttask_path }}/{{ project }}.yml"
+  delegate_to: localhost
+  register: posttask
+
+- name: delegate to project's post task
+  include_tasks: "{{ posttask_path }}/{{ project }}.yml"
+  when: posttask.stat.exists
+
+##### Start App Service ##############################################################
+
+- name: Start app service
+  service: name={{ app_service }} state=started
+  when: app_service is defined and project_type != 'python'
+  register: appservice_started
+
+- name: Start app service
+  command: "supervisorctl start {{ repo_name }} "
+  when: project_type == 'python'
+  register: appservice_started
+
+##### Start Web Service ##############################################################
+
+- name: Start web service
+  service: name={{ web_service }} state=started
+  when: web_service is defined
+  register: webservice_started
+
+######### HIT HEALTHCHECK URI ############################################################
+
+- name: Check health status
+  uri:
+   url: "http://{{ inventory_hostname }}:{{ health_port }}/{{ healthcheck_uri }}"
+   method: GET
+   status_code: 200
+   return_content: yes
+   headers:
+     Host: "{{ host_header | default('') }}"
+  register: health_status
+  retries: 60
+  delay: 5
+  until: health_status.status == 200
+

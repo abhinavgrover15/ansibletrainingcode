@@ -1,0 +1,7 @@
+{
+  "zone": "GCP-MUM-1A",
+  "action": "enable",
+  "poolname": "xx_xx_xx_TIL-MUM-1A_SG",
+  "serverip": "172.24.42.60",
+  "port": 5001
+}

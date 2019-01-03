@@ -1,0 +1,145 @@
+---
+
+- include_vars: "{{ project }}-vars.yml"
+  when: project is defined
+  tags: configuration
+
+
+- name: Creating necessary directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0755
+    owner: "{{ custom_dirs_owner }}"
+    group: "{{ custom_dirs_owner }}"
+    recurse: yes
+  with_items:
+    - '{{ custom_dirs | default([]) }}'
+  tags: configuration
+
+
+- name: install extra packages of arch type x86_64
+  yum:
+    name: "{{ item.pkg_name }}-{{ item.pkg_version }}.x86_64"
+    state: present
+  with_items:
+    - '{{ packages_x86_64 }}'
+  when: packages_x86_64 is defined
+
+
+################################################################
+
+- name: check whether we want to copy conf directory contents in httpd
+  local_action: stat path={{ template_path }}/{{ project }}/confroot
+  register: confroot_config
+
+- name: upload httpd confroot files
+  template: src={{ item }} dest={{ conf_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0664
+  with_fileglob:
+      - "templates/{{ project }}/confroot/*.j2"
+  when: confroot_config.stat.exists and confroot_config.stat.isdir
+
+
+- name: check whether we want to copy conf directory contents in nginx
+  local_action: stat path={{ template_path }}/{{ project }}/nginx_confroot
+  register: nginx_confroot_config
+
+- name: upload nginx confroot files
+  template: src={{ item }} dest={{ nginx_conf_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0644
+  with_fileglob:
+      - "templates/{{ project }}/nginx_confroot/*.j2"
+  when: nginx_confroot_config.stat.exists and nginx_confroot_config.stat.isdir
+
+- name: check whether we want to copy conf directory contents in nginx as per their ENVIRONMENTS(prod/stag/dr)
+  local_action: stat path={{ template_path }}/{{ project }}/nginx_confroot/{{ env }}
+  register: nginx_confroot_config_en
+
+- name: upload nginx confroot files as per their ENVIRONMENTS(prod/stag/dr)
+  template: src={{ item }} dest={{ nginx_conf_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0644
+  with_fileglob:
+      - "templates/{{ project }}/nginx_confroot/{{ env }}/*.j2"
+  when: nginx_confroot_config_en.stat.exists and nginx_confroot_config_en.stat.isdir
+
+- name: check whether we want to copy conf.d directory contents in httpd
+  local_action: stat path={{ template_path }}/{{ project }}/confd
+  register: confd_config
+
+- name: upload httpd confd files
+  template: src={{ item }} dest={{ conf_d_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0664
+  with_fileglob:
+    - "templates/{{ project }}/confd/*.j2"
+  when: confd_config.stat.exists and confd_config.stat.isdir
+
+- name: check whether we want to copy environment specific conf.d directory contents in httpd
+  local_action: stat path={{ template_path }}/{{ project }}/confd/{{ env }}
+  register: confd_config
+
+- name: upload httpd confd files
+  template: src={{ item }} dest={{ conf_d_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0664
+  with_fileglob:
+    - "templates/{{ project }}/confd/{{ env }}/*.j2"
+  when: confd_config.stat.exists and confd_config.stat.isdir
+
+- name: check whether we want to copy conf.d directory contents in nginx
+  local_action: stat path={{ template_path }}/{{ project }}/nginx_confd
+  register: nginx_confd_config
+
+- name: upload nginx confd files
+  template: src={{ item }} dest={{ nginx_conf_d_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0644
+  with_fileglob:
+      - "templates/{{ project }}/nginx_confd/*.j2"
+  when: nginx_confd_config.stat.exists and nginx_confd_config.stat.isdir
+
+- name: check whether we want to copy environment specific conf.d directory contents in nginx
+  local_action: stat path={{ template_path }}/{{ project }}/nginx_confd/{{ env }}
+  register: nginx_confd_config
+
+- name: upload nginx confd files
+  template: src={{ item }} dest={{ nginx_conf_d_root }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0644
+  with_fileglob:
+      - "templates/{{ project }}/nginx_confd/{{ env }}/*.j2"
+  when: nginx_confd_config.stat.exists and nginx_confd_config.stat.isdir
+
+- name: check whether we want to copy conf.modules.d directory contents in httpd
+  local_action: stat path={{ template_path }}/{{ project }}/confmodulesd
+  register: confmodulesd_config
+
+- name: upload confmodulesd files
+  template: src={{ item }} dest={{ conf_modules_d }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0664
+  with_fileglob:
+    - "templates/{{ project }}/confmodulesd/*.j2"
+  when: confmodulesd_config.stat.exists and confmodulesd_config.stat.isdir
+
+
+- name: check whether we want to install new systemd unit
+  local_action: stat path={{ template_path }}/{{ project }}/systemdunits
+  register: systemdunits
+
+- name: install new systemd units
+  template: src={{ item }} dest={{ systemdunits_loc }}/{{ item | basename | regex_replace('\.j2','') }} owner=root group=root mode=0644
+  with_fileglob:
+        - "templates/{{ project }}/systemdunits/*.j2"
+  when: systemdunits.stat.exists and systemdunits.stat.isdir
+
+- name: enable installed systemd unit and reload daemon
+  systemd: name={{ item | basename | regex_replace('\.j2','') }} enabled=yes daemon_reload=yes
+  with_fileglob:
+        - "templates/{{ project }}/systemdunits/*.j2"
+  when: systemdunits.stat.exists and systemdunits.stat.isdir
+
+
+- block:
+    - name: Creating ssl directory
+      file:
+        path: "{{ nginx_conf_root }}/ssl"
+        state: directory
+
+    - name: Copying Nginx SSL Certificates
+      copy:
+        src: "{{ item }}"
+        dest: "{{ nginx_conf_root }}/ssl/{{ item | basename }}"
+        mode: 0644
+      with_fileglob:
+        - "{{ files_path }}/{{ project }}/nginx_sslcerts/*"
+
+  when: nginx_sslcerts_dir.stat.exists and nginx_sslcerts_dir.stat.isdir

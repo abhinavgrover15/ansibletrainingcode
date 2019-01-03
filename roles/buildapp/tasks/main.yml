@@ -1,0 +1,101 @@
+---
+
+####### INSTALL GIT ###############################################################
+
+- name: Install git if not present
+  yum:
+    name: git
+    state: present
+
+####### CREATES BUILD DIR #########################################################
+
+- name: Create Build Directory if not present
+  file:
+    path: "{{ build_dir }}"
+    state: directory
+    mode: 0755
+
+####### CHECKOUT CODE #############################################################
+
+- name: Checkout Latest Code from Git
+  environment:
+    TMPDIR: "/home/jenkins/.ansible/tmp"
+  git:
+   repo: "{{ git_url }}/{{ repo_name }}.git"
+   accept_hostkey: yes
+   ssh_opts: "-o StrictHostKeyChecking=no -o ConnectTimeout=600"
+   dest: "{{ build_dir }}/{{ repo_name }}"
+   version: "{{ tag_or_commithash }}"
+  when: repo_name is defined
+  register: git_result
+
+- name: Delete .git directory
+  file:
+    path: "{{ build_dir }}/{{ repo_name }}/.git"
+    state: absent
+  when: git_result.changed
+
+####### RUN PROJECT BUILD COMMAND IF ANY ##########################################
+
+- name: Run Project Build Command
+  shell: "{{ item }}"
+  args:
+    chdir: "{{ build_dir }}/{{ repo_name }}"
+  when: git_result.changed and build_commands is defined and project_type != 'docker' and project_type != 'python'
+  with_items:
+    - "{{ build_commands }}"
+  register: buildoutput
+
+####### BUILD RPM PACKAGE #########################################################
+
+- name: Build RPM Package
+  command: "/usr/local/bin/fpm -s dir -t rpm -C {{ build_dir }}/{{ repo_name }} --prefix {{ dst_install_dir }} --name {{ project }}-{{ pkgtype }} --version {{ major_version }} --iteration {{ build_num }} --description 'RPM package for {{ project }} project @ {{ tag_or_commithash }}'"
+  args:
+    chdir: "{{ build_dir }}"
+  when: git_result.changed and dst_install_dir is defined and major_version is defined and build_num is defined and project_type != 'java' and project_type != 'docker'
+  register: package_result
+
+####### PUSH PACKAGE TO REPO SERVER ###############################################
+
+- name: Push Package to RPM REPO Server
+  command: scp -o StrictHostKeyChecking=no {{ build_dir }}/{{ project }}-{{ pkgtype }}-{{ major_version }}-{{ build_num }}.x86_64.rpm {{ item }}:/data/repository/
+  when: package_result.changed and project_type != 'java' and project_type != 'docker'
+  with_items:
+    - '{{ rpm_repo_servers }}'
+
+- block:
+    - name: Create storage directory on java repositories
+      command: ssh -tt -o StrictHostKeyChecking=no {{ item }} "mkdir -p /data/repository/{{ build_job_name }}/{{ build_num }}"
+      with_items:
+        - '{{ java_repo_servers }}'
+
+    - name: Push Package to JAVA REPO Server
+      command: scp -o StrictHostKeyChecking=no {{ build_dir }}/{{ repo_name }}/target/{{ pkg_name }} {{ item }}:/data/repository/{{ build_job_name }}/{{ build_num }}
+      with_items:
+        - '{{ java_repo_servers }}'
+  when: buildoutput.changed and project_type == 'java' and project_type != 'docker'
+
+#### BUILD FOR DOCKER PROJECTS #####################
+- name: Build Docker Image
+  command: "sudo docker build --no-cache {{ build_dir }}/{{ repo_name }}/ -f {{ build_dir }}/{{ repo_name }}/Dockerfile -t {{ repo_name }}:{{ tag_or_commithash }}"
+  when: git_result.changed and project_type == 'docker'
+  register: docker_image_result
+  delegate_to: localhost
+
+- name: Tag New Docker Image
+  command: "sudo docker tag {{ repo_name}}:{{ tag_or_commithash }} dtr.xxx.xxx/{{ repo_name }}:{{ tag_or_commithash }}"
+  when: git_result.changed and project_type == 'docker'
+  delegate_to: localhost
+
+- name: Push Docker Image to Registry
+  command: "sudo docker push dtr.xx.xx/{{ repo_name }}:{{ tag_or_commithash }}"
+  when: git_result.changed and project_type == 'docker'
+  delegate_to: localhost
+
+
+####### DELETE BUILD DIR #########################################################
+
+- name: Delete Build Dir
+  file:
+    path: "{{ build_dir }}"
+    state: absent

@@ -1,0 +1,117 @@
+---
+
+#- name: Run Update
+#  yum: name=* state=latest
+#  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+#  run_once: true
+
+- name: Install Net Tools
+  yum:
+    name: net-tools
+    state: present
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+- name: Remove Postfix Package
+  yum:
+    name: postfix
+    state: absent
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+- name: Get Old Kernel Packages
+  yum:
+    list=kernel-3.10*
+  register: pkg
+
+- name: Get Old Kernel Tools
+  yum:
+    list=kernel-tools-3.10*
+  register: pkgtools
+
+- name: Get Old Kernel Tools Libs
+  yum:
+    list=kernel-tools-libs-3.10*
+  register: pkgtoolslibs
+
+- name: Remove Old Kernel Packages in available state
+  yum:
+    name: "{{ item.envra }}"
+    state: absent
+  when: "{{ item.yumstate == 'available' }}"
+  with_items:
+      - "{{ pkg['results'] }}"
+
+- name: Remove Old Kernel Tools Packages in available state
+  yum:
+    name: "{{ item.envra }}"
+    state: absent
+  when: "{{ item.yumstate == 'available' }}"
+  with_items:
+      - "{{ pkgtools['results'] }}"
+
+- name: Remove Old Kernel Tools Libs Packages in available state
+  yum:
+    name: "{{ item.envra }}"
+    state: absent
+  when: "{{ item.yumstate == 'available' }}"
+  with_items:
+      - "{{ pkgtoolslibs['results'] }}"
+
+- name: Install EPEL RPM Key
+  rpm_key:
+    state: present
+    key: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+
+- name: Install EPEL Repo
+  yum:
+    name: http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+    state: present
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+- name: Install Kernel 4.4.136
+  yum:
+    name: kernel-lt-4.4.136-1.el7.elrepo
+    enablerepo: elrepo-kernel
+    state: present
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+- name: Install Kernel Tools 4.4.136
+  yum:
+    name: kernel-lt-tools-4.4.136-1.el7.elrepo
+    enablerepo: elrepo-kernel
+    state: present
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+- name: Update Grub Config
+  template:
+    src: 'grub.j2'
+    dest: '/etc/default/grub'
+    owner: root
+    group: root
+  register: result
+
+- debug: var=result
+
+- name: Rebuild grub
+  shell: grub2-mkconfig -o /boot/grub2/grub.cfg
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7" and result.changed
+
+- name: Reboot
+  shell: sleep 2 && shutdown -r now "Ansible updates triggered"
+  async: 1
+  poll: 0
+  ignore_errors: true
+  when: result.changed
+
+- name: Wait for instances to listen on port 22
+  wait_for:
+    state: started
+    host: "{{ inventory_hostname }}"
+    port: 22
+    delay: 45
+  when: result.changed
+
+- name: Remove Old Kernel
+  yum:
+    name: kernel-3.10*
+    state: absent
+  #when: result.changed

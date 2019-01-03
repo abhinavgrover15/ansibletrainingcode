@@ -1,0 +1,6 @@
+--- 
+
+new_pub_key: /tmp/id_rsa.pub
+new_priv_key: /tmp/id_rsa
+
+ansible_base_path: "/etc/ansible/autoconfig-jumbo"

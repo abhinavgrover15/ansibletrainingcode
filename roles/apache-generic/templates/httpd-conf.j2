@@ -1,0 +1,96 @@
+Header set X-Cool {{ inventory_hostname.split('.')[2] }}.{{ inventory_hostname.split('.')[3] }}
+#Global apache Variables
+ServerTokens {{ Server_Token }}
+ServerRoot {{ Server_Root }}
+PidFile {{ Pid_File }}
+ScoreBoardFile {{ Score_Board_File }}
+Timeout {{ Time_out }}
+KeepAlive {{ Keep_Alive_Value }}
+MaxKeepAliveRequests {{ MaxKeep_Alive_Requests }}
+KeepAliveTimeout  {{ Keep_Alive_Timeout_Value }}
+ExtendedStatus {{ Extended_Status }}
+Listen {{ Port_Number }}
+ServerSignature {{ Server_Signature }}
+
+#Server status to capture the stats of the apache
+
+<Location {{ Location }}>
+ SetHandler {{ Handler }} 
+ Require ip {{ whitelisted_source }}
+</Location>
+
+#Module Inclusion
+Include {{ Inclusion }}
+
+#Apache will run via this user
+
+User {{ User_Owner }}
+Group {{ Group_Owner }}
+ServerAdmin {{  Server_Admin }}
+
+<Directory {{ main_location }}>
+    AllowOverride {{ override_set_flag }}
+    Require all {{ access_flag }}
+</Directory>
+
+DocumentRoot {{ Doc_root }}
+
+
+<Directory {{ Web_Root_Dir }}>
+    AllowOverride {{ Allow_Override }}
+    Require {{ Grant_flag }}
+</Directory>
+
+<Directory {{ Doc_root }}>
+Options {{ Index_Options }}
+AllowOverride {{ Allow_Override }}
+Require {{ Grant_flag }}
+</Directory>
+
+<IfModule dir_module>
+    DirectoryIndex {{ Directory_Index }}
+</IfModule>
+
+<Files {{ File_Pattern }} >
+    Require {{ Deny_flag }}
+</Files>
+
+
+
+<IfModule alias_module>
+
+ScriptAlias {{ URI_SRC }}  {{ URI_DST }}
+
+</IfModule>
+
+<Directory {{ URI_DST }}>
+    AllowOverride {{ Allow_Override }}
+    Options {{ Sec_Option }}
+    Require {{ Grant_flag }}
+</Directory>
+
+
+<IfModule mime_module>
+    TypesConfig {{ Mime_Type_Config }}
+      AddType {{ httpd_Mime_Add_Type_com }}
+      AddType {{ httpd_Mime_Add_Type_tar }}
+      AddType {{ httpd_Mime_Add_Type_html }}
+    AddOutputFilter {{Add_Output_Filter }}
+</IfModule>
+
+AddDefaultCharset {{ Add_Default_Charset }}
+
+<IfModule mime_magic_module>
+    MIMEMagicFile {{ Mime_Magic_File }} 
+</IfModule>
+
+
+EnableSendfile {{ Enable_Send_file }}
+
+IncludeOptional {{ Include_Optional1 }}
+IncludeOptional {{ Include_Optional2 }}
+<DirectoryMatch {{ Svn_Pattern }}>
+    {{ Svn_Access }}
+</DirectoryMatch>
+ServerName {{ Server_Name }}
+

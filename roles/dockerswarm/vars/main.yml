@@ -1,0 +1,18 @@
+---
+
+### NAME OF DISK TO USE FOR LVM FOR DOCKER STORAGE
+directlvmdevice: "/dev/sdb"  
+ucp_version: "2.2.4"
+ucp_admin_password: "9xS*SxpmEY@,qfR6"
+ucp_fqdn: "gfc.abc.in"
+
+# Name of the Docker group
+docker_group: "docker"
+
+# Name of the SSH Deamon
+ssh_daemon: sshd
+
+python_sni_pip_dependencies:
+  - pyopenssl
+  - ndg-httpsclient
+  - pyasn1

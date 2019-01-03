@@ -1,0 +1,20 @@
+---
+
+- name: link config.ini.php to new deployment
+  file:
+    src: "/opt/conf/config.ini.php"
+    dest: "{{ dst_install_dir }}/Config/config.ini.php"
+    state: link
+
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: apache
+    group: apache
+    recurse: yes
+
+- name: link /NEWSANWSHOT/apilog to new deployment logs
+  file:
+    src: "/NEWSANWSHOT/apilog"
+    dest: "{{ dst_install_dir }}/WebAPI/logs"
+    state: link

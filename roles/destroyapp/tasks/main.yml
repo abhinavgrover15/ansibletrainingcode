@@ -1,0 +1,27 @@
+---
+
+- include_vars: "{{ repo_name }}_vars.yml"
+  when: repo_name is defined
+
+- name: Check if Deploy Type exists for repo
+  shell: grep "export {{repo_name}}_deploy_type" /root/.bashrc
+  ignore_errors: yes
+  register: checkresult
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=checkresult
+
+- name: Source the file
+  shell: . /root/.bashrc && echo ${{ repo_name}}_deploy_type
+  args:
+    executable: /bin/bash
+  register: deploy
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=deploy.stdout
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Destroy Docker Stack in respect to Color
+  command: "docker stack rm {{ repo_name }}-{{ deploy.stdout }}"
+  run_once: true
+  delegate_to: "{{ groups['docker_masters'][0] }}"

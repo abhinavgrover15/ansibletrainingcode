@@ -1,0 +1,13 @@
+---
+
+tomcat_pkg_name: "apache-tomcat"
+tomcat_version: "7.0.42-1"
+arch: "x86_64"
+service_location: "/etc/systemd/system"
+condition: "size 500M"
+rotate_count: "24"
+catalina_opts: ["$CATALINA_OPTS -server -Xms2048m -Xmx4096m -XX:PermSize=256M -XX:MaxPermSize=512M"]
+
+dirs:
+ - /opt/tomcat/conf/Catalina/localhost
+ - /log/tomcat-log

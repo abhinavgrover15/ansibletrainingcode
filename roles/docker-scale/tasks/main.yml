@@ -1,0 +1,4 @@
+---
+
+- name: Scale Docker Service
+  command: docker service scale {{ servicename }}={{ numberofreplicas }}

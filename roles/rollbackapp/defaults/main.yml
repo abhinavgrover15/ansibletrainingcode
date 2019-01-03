@@ -1,0 +1,8 @@
+---
+
+posttask_path: /etc/ansible/autoconfig-jumbo/roles/deployapp/tasks/posttasks
+location: "vsnl"
+project_type: "prod" 
+dst_install_dir: "{{ install_dir }}_{{ build_num }}"
+major_version: "1.0.0"
+build_num: "{{ ansible_date_time.epoch }}"

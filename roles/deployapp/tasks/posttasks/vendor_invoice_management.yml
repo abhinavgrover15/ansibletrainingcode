@@ -1,0 +1,25 @@
+---
+
+
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: apache
+    group: apache
+    recurse: yes
+
+
+- name: change permission for storage directory
+  file:
+    path: "{{ dst_install_dir }}/storage"
+    mode: 0777
+    owner: apache
+    group: apache
+    recurse: yes
+
+- name: Creates Symbolink of user assets
+  file:
+    src: "/data/user_assets"
+    dest: "/user_assets"
+    force: yes
+    state: link

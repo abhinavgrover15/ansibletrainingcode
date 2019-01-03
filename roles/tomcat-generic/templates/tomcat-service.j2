@@ -1,0 +1,15 @@
+[Unit]
+Description=tomcat Service
+After=network.target
+
+[Service]
+Type=forking
+User=app
+LimitNOFILE=65535
+WorkingDirectory=/opt/tomcat
+ExecStart=/opt/tomcat/bin/startup.sh
+ExecStop=/opt/tomcat/bin/shutdown.sh
+
+
+[Install]
+WantedBy=multi-user.target

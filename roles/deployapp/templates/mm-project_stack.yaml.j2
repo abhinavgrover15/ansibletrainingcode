@@ -1,0 +1,49 @@
+version: "3.6"
+
+services:
+  nginx:
+    image: nginx:latest
+    networks:
+      - hjn-prod-network
+    volumes:
+      - type: bind
+        source: /home/nginx/{{ repo_name}}-nginx-{{ deploy.stdout }}.conf
+        target: /etc/nginx/nginx.conf
+    ports:
+      - {{ service_deploy_port }}:{{ app_target_port }}
+    depends_on:
+      - {{ deploy.stdout }}
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      #placement:
+      #  constraints:
+      #    - node.role == manager
+      resources:
+        reservations:
+          memory: 4096M
+        limits:
+          memory: 4096M
+
+  {{ deploy.stdout }}:
+    image: ghb.abc.in/{{ repo_name}}:{{ tag_or_commithash }}
+    networks:
+      - hjn-prod-network
+    deploy:
+      replicas: {{ minreplicas }}
+      update_config:
+        parallelism: 1
+        delay: 10s
+      resources:
+        reservations:
+          memory: 2048M
+        limits:
+          memory: 4096M
+
+networks:
+  hjn-prod-network:
+    external: true

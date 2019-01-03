@@ -1,0 +1,91 @@
+---
+
+server_root: "/etc/httpd"
+conf_root: "{{server_root}}/conf"
+conf_d_root: "{{server_root}}/conf.d"
+extra_conf: "{{server_root}}/conf/extra"
+doc_root: "/var/www/html"
+yum_conf: "/etc/yum.repos.d"
+
+
+dirs:
+ - /etc/httpd/conf/extra
+ - /etc/httpd/conf/cer
+ - /var/cache/mod_proxy
+ - /log/apache-log
+
+packages:
+ - pkg: httpd
+ - pkg: httpd-tools
+ - pkg: mod_ssl
+
+modules:
+ - mod_jk.so
+ - mod_pagespeed_ap24.so 
+
+arch: x86_64
+version: 4.8.5-16.el7
+pkg_version: "2.4.6-45.el7.centos"
+
+
+Server_Token: Prod
+Server_Root: "/etc/httpd"
+Server_Signature: "Off"
+Port_Number: 80
+Pid_File: "/var/run/httpd/httpd.pid"
+Score_Board_File: "/etc/httpd/logs/httpd.scoreboard"
+Time_out: 300
+Keep_Alive_Value: "On"
+MaxKeep_Alive_Requests: 100
+Keep_Alive_Timeout_Value: 15
+ET_Switch: "On"
+LT_Port: 80
+User_Owner: apache
+Group_Owner: apache
+Email_ID: "devops@abc.in"
+Doc_root: "/var/www/html"
+Extended_Status: "On"
+Inclusion: "conf.modules.d/*.conf"
+Server_Admin: "24X7grp@abc.in"
+main_location: "/"
+override_set_flag: none
+access_flag: denied
+Web_Root_Dir: "/var/www"
+Allow_Override: None
+Grant_flag: "all granted"
+Index_Options: "Indexes FollowSymLinks"
+Index_Options2: "Indexes MultiViews FollowSymLinks"
+Directory_Index: "index.html index.php"
+Deny_flag: "all denied"
+Error_Log: "/log/apache-log/error_log"
+Log_Level: warn
+File_Pattern: ".ht*"
+Access_Log: "/log/apache-log/access_log"
+URI_SRC: "/cgi-bin/"
+URI_DST: "/var/www/cgi-bin/"
+Sec_Option: "None"
+Mime_Type_Config: "/etc/mime.types"
+Add_Output_Filter: "INCLUDES .shtml"
+Add_Default_Charset: "UTF-8"
+Mime_Magic_File: "conf/magic"
+Enable_Send_file: "on"
+Svn_Pattern: ".*\\.svn/.*"
+Svn_Access: "Deny From All"
+Server_Name: "127.0.0.1"
+Include_Optional1: "conf.d/*.conf"
+Include_Optional2: "conf/extra/*.conf"
+Order_Flag: "allow,deny"
+Allow_Flag: "Allow from all"
+URI_SRC_ICON: "/icons/"
+URI_DST_ICON: "/var/www/icons/"
+Location: "/server-status"
+Handler: "server-status"
+access_order: ""
+desired_order: "Require all granted"
+whitelisted_source: "192.168.36.202 192.168.36.203 192.168.36.204 192.168.36.205 192.168.26.252 192.169.36.202 192.169.36.203 192.169.31.53 192.169.34.202 192.169.34.203 192.168.33.248 172.27.10.163 127.0.0.1"
+httpd_Mime_Add_Type_com: "application/x-compress .Z"
+httpd_Mime_Add_Type_tar: "application/x-gzip .gz .tgz"
+httpd_Mime_Add_Type_html: "AddType text/html .shtml"
+cool_header: "0.0"
+condition: "size 500M"
+rotate_count: "24" 

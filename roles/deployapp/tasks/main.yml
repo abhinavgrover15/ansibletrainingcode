@@ -1,0 +1,7 @@
+---
+
+- import_tasks: docker-deploy.yml
+  when: project_type == 'docker'
+
+- import_tasks: vm-deploy.yml
+  when: project_type != 'docker'

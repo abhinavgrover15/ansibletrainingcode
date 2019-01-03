@@ -1,0 +1,14 @@
+---
+
+build_dir: "/home/jenkins/builds/build_{{ ansible_date_time.epoch }}"
+dst_install_dir: "{{ install_dir }}_{{ build_num }}"
+major_version: "1.0.0"
+build_num: "{{ ansible_date_time.epoch }}"
+git_url: git@bitbucket.org:xxx
+tag_or_commithash: "master"
+rpm_repo_servers:
+  - 192.169.x.x
+  - 192.168.x.x
+java_repo_servers:
+  - 172.26.x.x
+  - 192.168.x.x

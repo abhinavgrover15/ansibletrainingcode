@@ -1,0 +1,75 @@
+---
+
+- name: Creating-CI-repo-file
+  template: 
+   src=ci-repo.j2
+   dest=/etc/yum.repos.d/ci.repo
+   mode=0440
+
+- name: yum-clean-all
+  command: yum clean all
+  register: yum_clean
+  changed_when: '"\nCleaning up list of fastest mirrors" in yum_clean.stdout'
+  args:
+    warn: no 
+
+- name: installing specific version of gcc and gcc-c++
+  yum:
+    name: "{{ item }}-{{ version }}.{{ arch }}"
+    state: present
+  with_items: 
+    - '{{basic_packages}}'
+
+- name: install autoconf and libtool package 
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+      - '{{packages}}'
+
+- name: Add users | create users, shell, home dirs
+  user: 
+    name={{ item }} 
+    shell=/bin/bash 
+    createhome=yes
+    comment='{{ item }} service account user'
+  with_items: 
+    - '{{users}}'
+
+- name: Setup | authorized key upload
+  authorized_key: user=jenkins
+      key="{{ lookup('file', '{{ pubkey_path }}/public-key')}}"
+
+- name: Executing chage command for Jenkins, app and auto user
+  command: chage -M -1 {{ item }}
+  changed_when: False 
+  with_items:
+    - '{{users}}'
+  args:
+    warn: no
+
+- name: Removing sudoers file from immutable
+  command: chattr -i /etc/sudoers
+  changed_when: False
+
+- name: Adding Jenkins user in /etc/sudoers
+  lineinfile:
+    path: "/etc/sudoers"
+    line: "{{ item }}"
+  with_items:
+    - "Defaults:jenkins   !requiretty"
+    - "jenkins ALL=(ALL) NOPASSWD:ALL"
+
+- name: Make sudoers file immutable
+  command: chattr +i /etc/sudoers
+  changed_when: False
+
+
+- name: Add jenkins user to AllowGroups
+  replace:
+    backup: yes
+    dest: /etc/ssh/sshd_config
+    regexp: '^(AllowGroups(?!.*\bjenkins\b).*)$'
+    replace: '\1 jenkins'
+  notify:
+    - "restart sshd"

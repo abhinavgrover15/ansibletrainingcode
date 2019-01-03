@@ -1,0 +1,30 @@
+---
+
+- name: Create Swarm Directories for service secrets management, registry, auth and compose files
+  file:
+    path: /opt/{{ item }}
+    state: directory
+    mode: 0755
+    owner: dockremap
+    group: dockremap
+  with_items:
+    - stacks
+    - auth
+    - registry
+    - certs
+
+- name: Copy certs
+  template:
+    src: abc.crt
+    dest: /opt/certs/
+
+- name: Copy Keys
+  template:
+    src: abc.key
+    dest: /opt/certs/
+
+- name: Copy Auth File
+  template:
+    src: htpasswd
+    dest: /opt/auth/
+

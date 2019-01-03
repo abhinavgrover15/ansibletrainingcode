@@ -1,0 +1,13 @@
+---
+
+- hosts: "{{ deploy_on }}"
+  gather_facts: False
+  become: yes
+  remote_user: auto
+  #become_user: jenkins
+  pre_tasks:
+   - name: Gather Facts
+     setup:
+       gather_subset: "!facter,!ohai"
+  roles:
+    - destroyapp

@@ -1,0 +1,23 @@
+---
+
+basic_packages:
+ - gcc
+ - gcc-c++
+
+packages:
+ - autoconf
+ - libtool
+
+users:
+ - jenkins
+ - app
+ - auto
+
+ciname: Local CI Repo
+failovermethod: priority
+gpgcheck: 0
+arch: x86_64
+version: 4.8.5-28.el7_5.1
+pubkey_path: "/Users/abhinavgrover/ansiblecode/ansibletrcode/roles/common/files/public-keys"
+location: "gcp"
+secondary_location: "{{ 'gcp' if location == 'gcp' else 'aws' }}"

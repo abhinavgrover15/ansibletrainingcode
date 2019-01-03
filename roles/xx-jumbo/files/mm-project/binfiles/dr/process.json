@@ -1,0 +1,12 @@
+{
+        "apps": [{
+                "name": "mm",
+                "script": "build/server/server.js",
+                "cwd": "/opt/mm/",
+                "env": {
+                        "NODE_ENV": "dr",
+                        "NODE_PATH": "./build",
+                        "NODE_PORT": "80"
+                }
+        }]
+}

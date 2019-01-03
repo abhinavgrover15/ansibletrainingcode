@@ -1,0 +1,9 @@
+---
+
+default_docker_dependencies: ["bridge-utils","python-setuptools","python-setuptools-devel" ]
+
+python_pip_packages:
+  - epel-release
+  - python-pip
+
+python_sni_support_packages: [ ]

@@ -1,0 +1,51 @@
+---
+
+- name: Install Telegraf package on Node
+  yum: 
+    name: "{{ telegraf_name }}-{{ telegraf_version }}"
+    state: present
+
+
+- uri:
+    url: https://xxx.xxx.xxx/api/v0.1/getvmsearch?searchvalue={{ ansible_ssh_host }}&s_count=0&e_count=16&project=&env=&location=&status=&vmtype=&servertype=&bu=&zone=&vm_template=&astatus=
+    method: GET
+    return_content: yes
+    headers:
+      X-Email: "xxx@xxx.xxx"
+      Content-Type: "application/json"
+  register: infra_json
+
+- set_fact: server_services={{ infra_json.json.vmdata[0].services.split(',') }}
+
+- name: Set Server Location
+  set_fact: server_location={{ infra_json.json.vmdata[0].location }}
+
+- name: Set Server Environment
+  set_fact: server_env={{ infra_json.json.vmdata[0].vm_status }}
+
+- name: Set Aerospike Fact
+  set_fact:
+    aerospike_enabled: "{% if 'AEROSPIKE' in server_services %}yes{% else %}no{% endif %}"
+
+- name: Set Memcache Fact
+  set_fact:
+    memcache_enabled: "{% if 'MEMCACHE' in server_services %}yes{% else %}no{% endif %}"
+
+- name: Set Apache Fact
+  set_fact:
+    apache_enabled: "{% if 'APACHE' in server_services %}yes{% else %}no{% endif %}"
+
+- name: Set Nginx Fact
+  set_fact:
+    nginx_enabled: "{% if 'NGINX' in server_services %}yes{% else %}no{% endif %}"
+
+- name: Set Telegraf Server
+  set_fact: telegraf_server={{ vars[server_env+'_'+server_location] }}
+
+
+- name: Place Telegraf server stats file as per Location and Environment
+  template:
+    src: telegraf.conf.j2
+    dest: /etc/telegraf/telegraf.conf
+    mode: 0755
+  notify: restart telegraf

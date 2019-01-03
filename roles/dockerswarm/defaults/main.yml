@@ -1,0 +1,40 @@
+---
+
+dockerurl: https://download.docker.com
+
+# Docker repository branch
+docker_repo: main
+# docker_repo: testing
+# docker_repo: experimental
+
+## Default Bridge Variables
+default_bridge_name: bridge0
+default_bridge_network: 192.0.0.0/24
+default_bridge_ip: 192.0.0.5/24
+# Extra packages that have to be installed together with Docker
+docker_dependencies: "{{ default_docker_dependencies }}"
+
+# Docker swarm network can be define in order to be sure that
+# swarm cluster doesn't overlap with you infrastructure
+docker_swarm_network: 192.10.0.0/24
+docker_swarm_bridge_network: 192.20.0.0/24
+docker_swarm_networkname: til-prod-network
+# You can set any interface, that is listened by docker engine.
+# e.g. docker_swarm_interface: "eth1"
+docker_swarm_interface: "{{ ansible_default_ipv4['interface'] }}"
+docker_swarm_addr: "{{ hostvars[inventory_hostname]['ansible_' + docker_swarm_interface]['ipv4']['address'] }}"
+#docker_datatraffic_addr: 172.26.118.21
+docker_swarm_port: 2377
+
+# List of the users in the Docker group
+docker_admin_users:
+  - "{{ ansible_user | default(ansible_user_id) }}" # if ansible_user is not defined, we default to the ansible ansible_user_id fact
+
+# Switches disabling and enabling the docker-engine, docker group and swarm-mode setup.
+skip_engine: False # if true, skip the docker engine installation
+skip_group: False  # if true, does not add the docker_admin_users to the docker_group_name
+skip_swarm: False  # if true, skip the swarm setup
+skip_docker_py: False # if true, skip the docker-py
+skip_ucp: False # if true, skip installation of UCP
+docker_enable_clustering: true
+docker_enable_swarmdir: true # if true, create swarm directories

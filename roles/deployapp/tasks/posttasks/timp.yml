@@ -1,0 +1,54 @@
+---
+
+
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: apache
+    group: apache
+    recurse: yes
+
+
+- name: change permission for storage directory
+  file:
+    path: "{{ install_dir }}/storage"
+    mode: 0777
+    owner: apache
+    group: apache
+    recurse: yes
+
+- name: Creates Symbolink of user assets
+  file:
+    src: "/data/user_assets"
+    dest: "/user_assets"
+    force: yes
+    state: link
+
+- name: Creates Symbolink of timp_media
+  file:
+    src: "/opt/timp_media"
+    dest: "/opt/apache/htdocs/timpstg/public/uploads"
+    force: yes
+    state: link
+  when: env == "stg" or env == "qc"
+
+- name: Creates Symbolink of timp_media
+  file:
+    src: "/opt/timp_media"
+    dest: "/opt/apache/htdocs/timp/public/uploads"
+    force: yes
+    state: link
+  when: env == "prod"
+
+
+- name: Composer install
+  shell:
+    cmd: /usr/local/bin/composer install
+    chdir: "{{ install_dir }}"
+
+- name: change permission for vendor directory
+  file:
+    path: "{{ install_dir }}/vendor"
+    owner: apache
+    group: apache
+    recurse: yes

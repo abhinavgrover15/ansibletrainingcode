@@ -1,0 +1,35 @@
+---
+
+- hosts: xx
+  gather_facts: False
+  become: yes 
+  pre_tasks:
+   - name: Checking If this is the First Run
+     import_tasks: /etc/ansible/autoconfig-jumbo/pretasks/firstrun.yml
+   - name: Gather Facts
+     setup:
+       gather_subset: "!facter,!ohai"
+  roles:
+    - common
+    - nginx-generic
+    - java-generic
+    - all-jumbo
+  tags:
+    - xx
+
+- hosts: xx_dr
+  gather_facts: False
+  become: yes 
+  pre_tasks:
+   - name: Checking If this is the First Run
+     import_tasks: /etc/ansible/autoconfig-jumbo/pretasks/firstrun.yml
+   - name: Gather Facts
+     setup:
+       gather_subset: "!facter,!ohai"
+  roles:
+    - common
+    - nginx-generic
+    - java-generic
+    - all-jumbo
+  tags:
+    - xx_dr

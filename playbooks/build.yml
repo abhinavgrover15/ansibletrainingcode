@@ -1,0 +1,15 @@
+---
+
+- hosts: localhost 
+  gather_facts: False
+  become: yes
+  remote_user: jenkins
+  become_user: jenkins
+  pre_tasks:
+   - name: Gather Facts
+     setup:
+       gather_subset: "!facter,!ohai"
+  vars:
+    gitkeyfile: "/home/jenkins/.ssh/id_rsa"
+  roles:
+    - buildapp

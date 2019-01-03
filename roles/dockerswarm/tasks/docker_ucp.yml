@@ -1,0 +1,20 @@
+---
+
+- name: "Test if UCP primary controller already exists"
+  uri:
+    url: "https://localhost/_ping"
+    validate_certs: no
+  register: ucp_primary
+  ignore_errors: yes
+  when: "inventory_hostname == groups['swarm_managers'][0]"
+
+- name: "Add license file"
+  copy:
+    src: "docker_subscription.lic"
+    dest: /tmp
+
+- name: "Install primary UCP controller"
+  command: docker container run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /tmp/docker_subscription.lic:/docker_subscription.lic -e UCP_ADMIN_PASSWORD={{ ucp_admin_password }} --name ucp docker/ucp:{{ ucp_version }} install --host-address {{ ansible_default_ipv4['address'] }} --san {{ ucp_fqdn }}
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  ignore_errors: yes
+  when: "inventory_hostname == groups['swarm_managers'][0] and ucp_primary.status != 200"

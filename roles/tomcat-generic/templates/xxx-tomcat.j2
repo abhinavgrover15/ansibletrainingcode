@@ -1,0 +1,17 @@
+/log/tomcat-log/*out
+/log/tomcat-log/*txt
+/log/tomcat-log/*log
+{
+  {{ condition }}
+  dateext
+  dateformat .%Y%m%d-%s
+  copytruncate
+  rotate {{ rotate_count }}
+  missingok
+  notifempty
+  sharedscripts
+  compress
+  postrotate
+    /bin/systemctl reload tomcat.service > /dev/null 2>/dev/null || true
+  endscript
+}

@@ -1,0 +1,16 @@
+---
+
+telegraf_name: telegraf
+telegraf_version: 1.7.2-1
+
+Production_gcp: 172.26.102.12
+Production_chennai: 172.26.102.12
+
+Production_aws: 172.24.21.31
+Production_mumbai: 172.24.21.31
+
+Staging_gcp: 172.26.102.14
+Staging_chennai: 172.26.102.14
+
+Staging_aws: 192.168.44.99
+Staging_mumbai: 192.168.44.99

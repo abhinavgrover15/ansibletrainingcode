@@ -1,0 +1,23 @@
+---
+
+ansible_base_path: "/etc/ansible/autoconfig-jumbo"
+ansible_roles_path: "{{ ansible_base_path }}/roles"
+template_path: "{{ ansible_roles_path }}/xx-jumbo/templates"
+files_path: "/etc/ansible/autoconfig-jumbo/roles/xx-jumbo/files"
+
+server_root: /etc/httpd
+conf_root: "{{ server_root }}/conf"
+conf_d_root: "{{ server_root }}/conf.d"
+conf_modules_d: "{{ server_root }}/conf.modules.d"
+Error_Log: "/log/apache-log/error_log"
+Log_Level: "warn"
+Access_Log: "/log/apache-log/access_log"
+
+nginx_server_root: /etc/nginx
+nginx_conf_root: "{{ nginx_server_root }}"
+nginx_conf_d_root: "{{ nginx_server_root }}/conf.d"
+
+systemdunits_loc: "/etc/systemd/system"
+
+custom_dirs_owner: "app"
+env:

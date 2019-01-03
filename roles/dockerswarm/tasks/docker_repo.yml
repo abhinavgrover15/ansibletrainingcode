@@ -1,0 +1,32 @@
+---
+
+- name: Install Base Packages for Docker
+  yum: 
+    name: "{{ item }}"
+    state: present
+  with_items: 
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2
+  when: ansible_os_family == 'RedHat'
+
+- name: Create Yum Vars Directory
+  file:
+    path: /etc/yum.repos.d/vars
+    state: directory
+    mode: 0755
+
+- name: Add Docker URL Variable
+  template:
+    src: "templates/dockerurl.j2"
+    dest: "/etc/yum/vars/dockerurl"
+    mode: 0440
+
+- name: Check that docker-ce.repo exists
+  stat:
+    path: /etc/yum.repos.d/docker-ce.repo
+  register: stat_result
+
+- name: Add Docker Repository
+  command: yum-config-manager --add-repo "{{ dockerurl }}/linux/centos/docker-ce.repo"
+  when: stat_result.stat.exists == False

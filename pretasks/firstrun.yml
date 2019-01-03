@@ -1,0 +1,57 @@
+---
+
+- name: Test SSH Connection
+  command: ssh -o User=auto -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o PubkeyAuthentication=yes {{ inventory_hostname }} echo "Worked"
+  register: ssh_connection
+  connection: local
+  ignore_errors: yes
+  changed_when: False
+
+- name: If no connection, change key
+  connection: local
+  set_fact:
+    ansible_private_ssh_key: "/opt/sckey"
+  when: ssh_connection|failed
+
+- name: Download Private and Public Keys
+  uri:
+    url: "http://xx.xx.xx/{{ item }}"
+    method: GET
+    user: admin
+    password: q5Qa#~X;?%=`/CBv)R
+    force_basic_auth: yes
+    creates: yes
+    dest: /home/{{ item }}
+  with_items:
+    - id_rsa
+    - id_rsa.pub
+  delegate_to: localhost
+  run_once: True
+
+- name: Make use of old private key when connecting
+  set_fact: ansible_ssh_private_key_file="/opt/sckey"
+  when: ssh_connection|failed
+
+- name: Add new key to authorized_keys
+  authorized_key:
+     key={{ lookup('file', "/home/id_rsa.pub") }}
+     user=auto
+     state=present
+  when: ssh_connection|failed
+
+- name: Make our new key exclusive
+  authorized_key: key={{ lookup('file', "/home/id_rsa.pub") }}
+      user=auto
+      state=present
+      exclusive=yes
+  when: ssh_connection|failed
+
+- name: Remove Keys from Temp and Home Locations
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /home/id_rsa
+    - /home/id_rsa.pub
+  delegate_to: localhost
+  run_once: True

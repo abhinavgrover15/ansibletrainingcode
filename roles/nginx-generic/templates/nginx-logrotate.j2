@@ -1,0 +1,15 @@
+/var/log/nginx/*log {
+  size 500M
+  create 0644 nginx nginx
+  dateext
+  dateformat .%Y%m%d-%s
+  copytruncate
+  rotate 10
+  missingok
+  notifempty
+  sharedscripts
+  compress
+  postrotate
+    /bin/systemctl reload nginx.service > /dev/null 2>/dev/null || true
+  endscript
+}

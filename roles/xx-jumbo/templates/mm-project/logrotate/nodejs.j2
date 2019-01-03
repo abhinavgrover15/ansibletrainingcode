@@ -1,0 +1,15 @@
+/var/log/node/*log {
+  size 500M
+  create 0644 app app
+  dateext
+  dateformat .%Y%m%d-%s
+  copytruncate
+  rotate 10
+  missingok
+  notifempty
+  sharedscripts
+  compress
+  postrotate
+    /bin/systemctl reload pm2srv > /dev/null 2>/dev/null || true
+  endscript
+}

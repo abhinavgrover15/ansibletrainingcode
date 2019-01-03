@@ -1,0 +1,11 @@
+---
+
+java_pkg_name: "jdk"
+java_version: "1.8.0-20"
+arch: "x86_64"
+
+
+security_path: "/usr/java/default/jre/lib/security/"
+jar_files:
+   - local_policy.jar
+   - US_export_policy.jar

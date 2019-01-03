@@ -1,0 +1,50 @@
+---
+
+- name: installing java development kit 
+  yum:
+    name: "{{ java_pkg_name }}-{{ java_version }}.{{ arch }}"
+    state: present
+
+- name: Creates Symbolink for Java default directory
+  file:
+    src: "/usr/java/jdk{{ java_version }}"
+    dest: "/usr/java/default"
+    state: link
+
+- name: check if java executable file exists
+  stat: path=/usr/local/bin/java follow=yes
+  register: javafilestat
+
+- name: create java executable file links
+  shell: 'ln -s /usr/java/default/bin/* /usr/local/bin/'
+  when: javafilestat.stat.islnk is not defined
+  args:
+    warn: no
+
+- name: Creates Symbolink of Java executable file
+  file:
+    src: "/usr/java/default/bin/java"
+    dest: "/bin/java"
+    state: link
+
+- name: Create java.sh file to contain JAVA_HOME default directory
+  copy:
+    dest: "/etc/profile.d/java.sh"
+    content: 'export JAVA_HOME="/usr/java/default"'
+    mode: 0644
+
+
+- name: Fetch Java version
+  shell: java -version 2>&1 | grep version | awk '{print $3}' | sed 's/"//g' | cut -d _ -f 1 |  rev | cut -d"." -f2- | rev
+  register: java_version
+
+- copy:
+    src: "{{ item }}"
+    dest: "{{security_path}}/{{item}}"
+    owner: root
+    group: root
+    mode: 0644
+    force: yes
+  when: java_version.stdout | version_compare('1.8', '==')
+  with_items:
+    - '{{jar_files}}'

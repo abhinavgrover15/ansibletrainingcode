@@ -1,0 +1,77 @@
+---
+
+
+- name: install Apache-tomcat package
+  yum:
+    name: "{{ tomcat_pkg_name }}-{{ tomcat_version }}.{{ arch }}"
+    state: present
+
+
+- name: Creating tomcat link symbolink
+  file:
+    src: "/opt/apache-tomcat-{{ tomcat_version }}"
+    dest: "/opt/tomcat"
+    state: link
+    force: yes
+
+- name: Creates apache-tomcat custom directories
+  file: 
+     path: "{{ item }}" 
+     state: directory 
+     mode: 0755
+     owner: app
+     group: app
+     recurse: yes
+  with_items:
+      - '{{ dirs }}'
+
+- name: Creates Symbolink of tomcat logs 
+  file:
+    src: "/log/tomcat-log"
+    dest: "/opt/tomcat/logs"
+    mode: 0755
+    owner: app
+    group: app
+    state: link
+    force: yes
+
+- name: Executing chage command for tomcat app user
+  command: chage -M -1 app
+  changed_when: False
+  args:
+    warn: no
+
+- name: Generating tomcat set environment script
+  template:
+   src=setenv-sh.j2
+   dest=/opt/tomcat/bin/setenv.sh
+   mode=0664
+   owner=app
+   group=app
+
+- name: Creating tomcat service
+  template:
+   src=tomcat-service.j2
+   dest="{{ service_location }}/tomcat.service"
+   mode=0644
+   owner=root
+   group=root
+
+- name: enable service tomcat and daemon reload
+  systemd:
+    name: "tomcat.service"
+    enabled: yes
+    daemon_reload: yes
+
+- name: changing ownership of tomcat directory recursively
+  file:
+    path: "/opt/apache-tomcat-{{ tomcat_version }}"
+    owner: app
+    group: app
+    recurse: yes
+
+- name: Creating logrotate config file for Tomcat
+  template:
+   src=xxx-tomcat.j2
+   dest="/etc/logrotate.d/xxx-tomcat"
+   mode=0644

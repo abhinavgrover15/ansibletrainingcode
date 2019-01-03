@@ -1,0 +1,88 @@
+---
+
+- name: Install Docker dependencies.
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ docker_dependencies }}"
+
+- name: Install Docker CE
+  yum:
+   name: docker-ce-18.03.1.ce-1.el7.centos
+   state: present
+
+- name: Install PIP
+  easy_install:
+    name: pip
+    state: latest
+
+- name: Create Docker Directory
+  file:
+    path: /etc/docker
+    state: directory
+    mode: 0755
+
+#- name: Check for Default Docker Bridge
+#  shell: brctl show | grep {{ default_bridge_name }}
+#  ignore_errors: True
+#  register: br_result
+
+#- name: Create Default Docker Bridge
+#  shell: brctl addbr {{ default_bridge_name }}
+#  when: br_result.failed
+
+#- name: Add IP To Default Bridge
+#  shell: ip addr add {{ default_bridge_ip }} dev {{ default_bridge_name }}
+#  when: br_result.failed
+
+#- name: Bring Bridge Network Up
+#  shell: ip link set dev {{ default_bridge_name }} up
+#  when: br_result.failed
+
+#- name: Make Bridge Settings Persistent
+#  template:
+#    src: ifcfg-bridge0.j2
+#    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ default_bridge_name }}"
+#    mode: 0644
+#    owner: root
+#    group: root
+
+- name: Place daemon.json in /etc/docker
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: 0644
+    owner: root
+    group: root
+  register: result
+
+- name: Place subuid in /etc/
+  template:
+    src: subuid.j2
+    dest: /etc/subuid
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Place subgid in /etc/
+  template:
+    src: subgid.j2
+    dest: /etc/subgid
+    mode: 0644
+    owner: root
+    group: root
+
+
+- name: restart docker
+  service:
+    name: "docker"
+    state: started
+    daemon_reload: yes
+    enabled: yes
+  when: result.changed
+
+- name: wait for docker to restart
+  wait_for:
+    path: /var/run/docker.sock
+    delay: 10
+  when: result.changed

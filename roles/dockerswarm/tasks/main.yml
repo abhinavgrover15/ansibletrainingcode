@@ -1,0 +1,36 @@
+---
+
+# Variables setup
+- name: Include os-specific variables.
+  include_vars: "{{ ansible_os_family }}.yml"
+
+# Repo Setup
+- name: docker_repo.yml
+  import_tasks: docker_repo.yml 
+
+- name: Install Docker CE on all nodes if not installed
+  import_tasks: docker_engine.yml
+#  when: not clustered['stat']['exists']
+
+# Install docker-py
+- name: Install Docker PY for Docker API
+  import_tasks: docker_py.yml
+  when: >
+        not skip_docker_py and docker_enable_clustering
+
+- name: Setup Docker Swarm Cluster
+  import_tasks: docker_swarm.yml
+  when: >
+        not skip_swarm and docker_enable_clustering
+
+- name: Setup Swarm Directories
+  import_tasks: swarm_dir.yml
+  when: docker_enable_swarmdir 
+
+# Install the Docker UCP
+#- import_tasks: docker_ucp.yml
+#  when: not skip_ucp
+
+# Adds the Docker admin users to the Docker group
+#- include: docker_group.yml
+#  when: not skip_group

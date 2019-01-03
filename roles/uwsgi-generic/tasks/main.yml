@@ -1,0 +1,65 @@
+---
+
+- name: Install Python Development Package
+  yum:
+    name: python-devel
+    state: present
+
+- name: Install openssl Development Package
+  yum:
+    name: openssl-devel
+    state: present
+
+- name: Install Python Setup Tools
+  yum:
+    name: python-setuptools
+    state: present
+
+- name: Install PIP 
+  command: "easy_install pip"
+
+- name: Upgrade setuptools
+  command: "pip install --upgrade setuptools"
+
+- name: Install virtualenv
+  command: "easy_install virtualenv"
+
+- name: check if virtualenv dir exists
+  stat: path=/opt/virtualenvs
+  register: venvstat
+
+- name: Create Virtualenv Dir if not exists
+  shell: 'mkdir -p /opt/virtualenvs'
+  when: not venvstat.stat.exists
+  args:
+    warn: no
+
+- name: Check if app virtualenv exits
+  stat: path=/opt/virtualenvs/{{ appvenvname }}
+  register: appvenvstat
+
+- name: Create Application Virtualenv if not exists
+  shell: "virtualenv /opt/virtualenvs/{{ appvenvname }}"
+  when: not appvenvstat.stat.exists
+  args:
+    warn: no
+
+- name: Install uwsgi in app virtual environment
+  pip:
+   name: uwsgi
+   virtualenv: /opt/virtualenvs/{{ appvenvname }}
+
+- name: Change Permissions
+  command: "chmod 755 /opt/virtualenvs/{{ appvenvname }}/bin/uwsgi"
+
+- name: Install Supervisor
+  command: "easy_install supervisor"
+
+- name: Create supervisord.d directory
+  shell: 'mkdir -p /etc/supervisord.d'
+
+- name: Generating Supervisor Configuration file
+  template:
+   src=supervisord-conf.j2
+   dest=/etc/supervisord.conf
+   mode=0644

@@ -1,0 +1,14 @@
+---
+# handlers file docker service
+#
+- name: restart docker
+  service:
+    name: "docker"
+    state: started
+    daemon_reload: yes
+    enabled: yes
+
+- name: wait for docker to restart
+  wait_for:
+    path: /var/run/docker.sock
+    delay: 10

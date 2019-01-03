@@ -1,0 +1,128 @@
+---
+
+#- name: Create a custom swarm network
+#  docker_network:
+#    name: docker_gwbridge
+#    driver_options:
+#      com.docker.network.bridge.enable_icc: "false"
+#      com.docker.network.bridge.enable_ip_masquerade: "true"
+  #    com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+#      com.docker.network.driver.mtu: "1500"
+#      com.docker.network.bridge.name: docker_gwbridge
+#    ipam_options:
+#      subnet: "{{ docker_swarm_bridge_network }}"
+#      gateway: "{{ docker_swarm_bridge_network | ipaddr('net') | ipaddr('1') | ipaddr('ip') }}"
+#  when: docker_swarm_bridge_network is defined and docker_swarm_bridge_network | ipaddr('net')
+
+- name: Check if "Swarm Mode" is enabled.
+  shell: docker info
+  changed_when: False
+  register: docker_info
+
+- name: Init "Swarm Mode" on the first manager.
+  shell: docker swarm init
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+        --data-path-addr "{{ docker_datatraffic_addr | default(docker_swarm_addr) }}"   ### if docker_datatrffic_addr not defined , docker_swarm_addr will be picked up
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and inventory_hostname == groups['swarm_managers'][0]"
+
+- name: Get the worker join-token.
+  shell: docker swarm join-token -q worker
+  changed_when: False
+  register: docker_worker_token
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  delegate_facts: True
+  when: "'swarm_workers' in group_names"
+
+- name: Get the manager join-token.
+  shell: docker swarm join-token -q manager
+  changed_when: False
+  register: docker_manager_token
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  delegate_facts: True
+  when: "'swarm_managers' in group_names
+    and inventory_hostname != groups['swarm_managers'][0]"
+
+- name: Declare the address of the first Swarm manager as a fact.
+  set_fact:
+    docker_manager_address: "{{ docker_swarm_addr }}:{{ docker_swarm_port }}"
+  when: "inventory_hostname == groups['swarm_managers'][0]"
+
+- name: Distribute the fact containing address of the first Swarm manager.
+  set_fact:
+    docker_manager_address: "{{hostvars[groups['swarm_managers'][0]]['docker_manager_address'] }}"
+  when: "inventory_hostname != groups['swarm_managers'][0]"
+
+- name: Join the pending Swarm worker nodes.
+  shell: docker swarm join
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+        --token "{{ docker_worker_token.stdout }}"
+        {{ docker_manager_address }}
+  changed_when: False
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and docker_info.stdout.find('Swarm: pending') == -1
+    and 'swarm_workers' in group_names"
+
+- name: Join the pending Swarm manager nodes.
+  shell: docker swarm join
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+        --token "{{ docker_manager_token.stdout }}"
+        {{ docker_manager_address }}
+  changed_when: False
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and docker_info.stdout.find('Swarm: pending') == -1
+    and 'swarm_managers' in group_names
+    and inventory_hostname != groups['swarm_managers'][0]"
+
+- name: Get list of labels
+  command: >-
+         docker inspect
+         --format {% raw %}'{{range $key, $value := .Spec.Labels}}{{printf "%s\n" $key}}{{end}}'{% endraw %}
+         {{ ansible_fqdn }}
+  register: docker_swarm_labels
+  changed_when: False
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  delegate_facts: True
+  when: "docker_info.stdout.find('Swarm: active') == -1"
+  tags:
+    - swarm_labels
+
+- name: Remove labels from swarm node
+  command: docker node update --label-rm {{ item }} {{ ansible_fqdn }}
+  with_items: "{{ docker_swarm_labels.stdout_lines }}"
+  when: item not in swarm_labels
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  delegate_facts: True
+  when: "docker_info.stdout.find('Swarm: active') == -1"
+  tags:
+    - swarm_labels
+
+- name: Asign labels to swarm nodes | if any
+  command: docker node update --label-add {{ item }}=true {{ ansible_fqdn }}
+  when: item not in docker_swarm_labels.stdout_lines
+  with_items:
+    - "{{ swarm_labels  | default([]) }}"
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  delegate_facts: True
+  when: "docker_info.stdout.find('Swarm: active') == -1"
+  tags:
+    - swarm_labels
+
+- name: Check for Existing Docker Overlay Network
+  shell: docker network ls | grep {{ docker_swarm_networkname }}
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  run_once: true
+  ignore_errors: True
+  #when: "inventory_hostname == groups['swarm_managers'][0]"
+  register: docker_network
+
+- debug: var=docker_network
+
+- name: Create Docker Overlay Network
+  shell: docker network create --opt encrypted --driver overlay --subnet={{ docker_swarm_network }} --gateway={{ docker_swarm_network | ipaddr('net') | ipaddr('1') | ipaddr('ip') }} --opt com.docker.network.mtu=1500 {{ docker_swarm_networkname }}
+  delegate_to: "{{ groups['swarm_managers'][0] }}"
+  run_once: true
+  when: docker_network.failed

@@ -1,0 +1,11 @@
+---
+
+php_packages:
+  - php56w
+
+php_pear_extensions:
+  - Mail
+
+custom_dirs: ["/opt/conf","/opt/apache/htdocs"]
+custom_files_loc: "/opt/conf"
+custom_dirs_owner: "apache"

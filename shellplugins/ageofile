@@ -1,0 +1,14 @@
+#!/bin/bash
+
+daysec=86400
+tnage=`ls --full-time $1 | awk '{printf "%3s %1s\n", $6, $7}'`
+nage=$(date --date="$tnage" +%s)
+cdate=$(date +%s)
+sage="$(echo "$cdate - $nage" | bc )"
+age="$((sage / 86400))"
+if (( $age >= 14 )) ;
+then
+echo "timetochange"
+else
+echo "nochangereq"
+fi

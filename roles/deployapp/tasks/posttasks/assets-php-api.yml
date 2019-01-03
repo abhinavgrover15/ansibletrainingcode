@@ -1,0 +1,20 @@
+---
+
+- name: link config.php to new deployment
+  file:
+    src: "/opt/props/config.php"
+    dest: "{{ dst_install_dir }}/application/config/config.php"
+    state: link
+
+- name: link database.php to new deployment
+  file:
+    src: "/opt/props/database.php"
+    dest: "{{ dst_install_dir }}/application/config/database.php"
+    state: link
+
+- name: change new deployment ownership
+  file:
+    path: "{{ dst_install_dir }}"
+    owner: apache
+    group: apache
+    recurse: yes

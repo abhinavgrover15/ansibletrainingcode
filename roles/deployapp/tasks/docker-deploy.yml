@@ -1,0 +1,194 @@
+---
+
+- include_vars: "{{ repo_name }}_vars.yml"
+  when: repo_name is defined
+
+- name: Create Logs Directory on Host to map to container
+  file:
+    path: "/log/{{ repo_name }}"
+    state: directory
+    mode: 0755
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Check if Deploy Type exists for repo
+  shell: grep "export {{repo_name}}_deploy_type" /root/.bashrc
+  ignore_errors: yes
+  register: checkresult
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=checkresult
+
+- name: Adding the path in the bashrc files
+  lineinfile: dest=/root/.bashrc line='export {{ repo_name}}_deploy_type=BLUE' insertafter='EOF' state=present
+  when: checkresult.rc != 0
+  register: fileupdate
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Source the file
+  shell: . /root/.bashrc && echo ${{ repo_name}}_deploy_type
+  args:
+    executable: /bin/bash
+  register: deploy
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=deploy.stdout
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Set Green Port
+  set_fact: 
+    service_deploy_port: "{{ GREEN_PORT }}"
+  when: deploy.stdout == "BLUE"
+  register: deploystate
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=deploystate
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Set Green Deploy Type
+  replace:
+    dest    : /root/.bashrc
+    replace : 'export {{ repo_name}}_deploy_type=GREEN'
+    regexp  : 'export {{ repo_name}}_deploy_type=BLUE'
+    backup  : yes
+  when: deploy.stdout == "BLUE"
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Set Blue Deploy Type
+  replace:
+    dest    : /root/.bashrc
+    replace : 'export {{ repo_name}}_deploy_type=BLUE'
+    regexp  : 'export {{ repo_name}}_deploy_type=GREEN'
+    backup  : yes
+  when: deploy.stdout == "GREEN"
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Set Blue Port
+  set_fact: 
+    service_deploy_port: "{{ BLUE_PORT }}"
+  when: deploy.stdout == "GREEN"
+  register: deploystate
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=deploystate
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- debug: var=service_deploy_port
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Login to Docker Registry
+  command: "docker login -u admin -p hfgfg https://yhu.abc.in" 
+
+- name: Download Docker Image 
+  command: "docker pull dtr.abc.in/{{ repo_name }}:{{ tag_or_commithash }}"
+
+#- name: Create Docker Service in respect to Color
+#  command: "docker service create --name {{ repo_name }}-{{ deploy.stdout }} --mount type=bind,src=/data1/logs/{{ repo_name }},dst={{ container_dir_tobe_mapped }} --publish published={{ service_deploy_port }},target={{ app_target_port }} --replicas {{ number_of_service_replicas }} dtr.abc.in/{{ repo_name }}:{{ tag_or_commithash }}"
+#  run_once: true
+#  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Create DockerStack Directory if not exists
+  file:
+    path: /usr/local/sbin/dockerstacks
+    state: directory
+    mode: 0755
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Copy Stack File
+  template:
+    src: "{{ repo_name }}_stack.yml.j2"
+    dest: /usr/local/sbin/dockerstacks/{{ repo_name }}_stack.yml
+    owner: root
+    group: root
+    mode: 0644
+  run_once: true
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Create Nginx Directory if not exists
+  file:
+    path: /home/nginx
+    state: directory
+    mode: 0755
+  #delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Copy nginx.conf file
+  template:
+    src: "{{ repo_name }}-nginx.conf.j2"
+    dest: /home/nginx/{{ repo_name }}-nginx-{{ deploy.stdout }}.conf
+    owner: root
+    group: root
+    mode: 0644
+  run_once: true
+  #delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Create Docker Stack in respect to Color
+  command: "docker stack deploy -c /usr/local/sbin/dockerstacks/{{ repo_name }}_stack.yml {{ repo_name }}-{{ deploy.stdout }}"
+  run_once: true
+  delegate_to: "{{ groups['docker_masters'][0] }}"
+
+- name: Disable Old Members from Service Group in Load Balancer
+  uri:
+    url: "{{ apiurl }}"
+    method: POST
+    body: {"zone": "{{ vipzone }}","action": "disable","poolname": "{{ poolname }}","serverip": "{{ item }}","port": "{{ BLUE_PORT }}"}
+    status_code: 200
+    body_format: json
+    headers:
+      X-Location: "{{ viplocation }}"
+    return_content: yes
+  when: deploy.stdout == "BLUE"
+  register: retcon
+  with_items:
+    - "{{ groups['container'] }}"
+
+- debug: var=retcon
+
+- name: Disable Old Members from Service Group in Load Balancer
+  uri:
+    url: "{{ apiurl }}"
+    method: POST
+    body: {"zone": "{{ vipzone }}","action": "disable","poolname": "{{ poolname }}","serverip": "{{ item }}","port": "{{ GREEN_PORT }}"}
+    status_code: 200
+    body_format: json
+    return_content: yes
+    headers:
+      X-Location: "{{ viplocation }}"
+  register: retcon
+  when: deploy.stdout == "GREEN"
+  with_items:
+    - "{{ groups['container'] }}"
+
+- debug: var=retcon
+
+- name: Enable Old Members from Service Group in Load Balancer
+  uri:
+    url: "{{ apiurl }}"
+    method: POST
+    body: {"zone": "{{ vipzone }}","action": "enable","poolname": "{{ poolname }}","serverip": "{{ item }}","port": "{{ BLUE_PORT }}"}
+    status_code: 200
+    body_format: json
+    return_content: yes
+    headers:
+      X-Location: "{{ viplocation }}"
+  register: retcon
+  when: deploy.stdout == "GREEN"
+  with_items:
+    - "{{ groups['container'] }}"
+
+- debug: var=retcon
+
+- name: Enable  Old Members from Service Group in Load Balancer
+  uri:
+    url: "{{ apiurl }}"
+    method: POST
+    body: {"zone": "{{ vipzone }}","action": "enable","poolname": "{{ poolname }}","serverip": "{{ item }}","port": "{{ GREEN_PORT }}"}
+    status_code: 200
+    body_format: json
+    return_content: yes
+    headers:
+      X-Location: "{{ viplocation }}"
+  when: deploy.stdout == "BLUE"
+  register: retcon
+  with_items:
+    - "{{ groups['container'] }}"
+
+- debug: var=retcon
